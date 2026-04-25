@@ -15,6 +15,7 @@ The goal is to measure the paths that matter for LLM inference:
 
 - `BENCHMARK_SPEC.md`: detailed benchmark plan and methodology
 - `RESULTS.md`: durable run log and headline results
+- `2026-04-25-gh200-benchmarking.md`: current blog post draft
 - `run-full-benchmark.sh`: full benchmark runner
 - `run-smoke-test.sh`: shorter preflight benchmark
 - `analyze-results.py`: parser and plot generator
