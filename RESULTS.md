@@ -1,0 +1,735 @@
+# Dual GH200 Benchmark Progress
+
+This file is the durable progress log for the benchmark. Update it before and after each major step so partial progress survives a crash or reboot.
+
+## Current Status
+
+- 2026-04-25: Implementation started from `BENCHMARK_SPEC.md`.
+- 2026-04-25: Full benchmark completed and analyzed.
+
+## Run Directories
+
+- Smoke without tools: `/home/grace/gh200-bench/smoke-20260425-133904`
+- Smoke with tools: `/home/grace/gh200-bench/smoke-20260425-134519`
+- Full run: `/home/grace/gh200-bench/run-20260425-134620`
+
+## Completed Steps
+
+- `BENCHMARK_SPEC.md` reviewed and corrected for executable output contracts.
+- Added durable progress logging in `scripts/common.sh`.
+- Added `run-full-benchmark.sh` with resumable section markers.
+- Added `run-smoke-test.sh`.
+- Added NVBandwidth resolver helpers.
+- Added custom CUDA benchmark sources under `src/`.
+- Replaced `analyze-results.py` with an analyzer matching the revised output structure.
+- Smoke test created `/home/grace/gh200-bench/smoke-20260425-133904`; topology discovery succeeded, but benchmark tools were not installed yet.
+- Custom CUDA benchmarks compile successfully with `/usr/local/cuda-13.0/bin/nvcc`.
+- Third-party tools cloned under `/home/grace/gh200-bench/tools`.
+- STREAM built successfully with Arm large-code-model/non-PIE flags.
+- BabelStream built successfully with CUDA 13.0 and `sm_90`.
+- mixbench built successfully via CMake under `mixbench-cuda/build`.
+- NVBandwidth built successfully against a local Boost 1.83.0 program_options install.
+- Smoke test `/home/grace/gh200-bench/smoke-20260425-134519` produced real measurements: HBM Triad about 3716 GB/s per GPU, NVBandwidth host-to-device about 380 GB/s, STREAM Triad about 325-327 GB/s per Grace node.
+- Smoke decision is `FIX FIRST` only because STREAM is below the expected 380-486 GB/s band. THP is `madvise`, CPU governor is `ondemand`, and passwordless sudo is unavailable, so governor/THP changes cannot be applied by this runner.
+- Full run `/home/grace/gh200-bench/run-20260425-134620` completed at 2026-04-25 13:52 CEST.
+- Analysis succeeded via `uv run --with numpy --with matplotlib analyze-results.py /home/grace/gh200-bench/run-20260425-134620`.
+- Summary: `/home/grace/gh200-bench/run-20260425-134620/summary.md`.
+- Machine-readable results: `/home/grace/gh200-bench/run-20260425-134620/results.json`.
+- Parsed 112 raw files with 0 parse failures.
+- Extended `memory_modes.cu` to add `cudaMallocManaged_alternating` and `numa_alloc_onnode_unregistered_cpu_first`.
+- Reran the four memory-mode configurations at 2026-04-25 14:07-14:08 CEST.
+- Regenerated analysis after the extended memory-mode run.
+- Generated methodology: `/home/grace/gh200-bench/run-20260425-134620/methodology.md`.
+- Generated roofline plot: `/home/grace/gh200-bench/run-20260425-134620/plots/roofline_combined.png`.
+- Updated results now include 24 path rows, 4 memory-mode configs with 7 modes each, 24 latency paths, 24 sustained paths, 2 mixbench summaries, and 0 parse failures.
+- Checked NVBandwidth upstream on 2026-04-25: built checkout is already current at `v0.9` (`4a49bda`, 2026-04-08); no newer upstream commit was available.
+- Added and executed the NVBandwidth follow-up suite from `BENCHMARK_SPEC.md` into `/home/grace/gh200-bench/run-20260425-134620/results/additional`.
+- Additional suite wrote 60 files: JSON all-test baseline, topology/P2P snapshots, thermal/power/clock snapshots, bidirectional host/device CE+SM tests, all-to-host/host-to-all contention tests, latency tests, buffer-size sweep, and huge-page variants.
+- User enabled CPU governor `performance` and THP `always` on 2026-04-25.
+- A partial `tuned_performance_governor` run was stopped and marked superseded because THP changed from `madvise` to `always` during execution.
+- Clean tuned rerun completed in `/home/grace/gh200-bench/run-20260425-134620/results/tuned_performance_thp_always` with CPU governor `performance` and THP `always`.
+- User raised the GPU power limit from 400 W to 450 W and locked graphics clocks with `sudo nvidia-smi -lgc 1980,1980` on 2026-04-25.
+- 450 W locked-clock rerun completed in `/home/grace/gh200-bench/run-20260425-134620/results/tuned_450w_locked_clocks`.
+
+## Headline Measurements
+
+- HBM local: GPU0 3721.8 GB/s, GPU1 3716.5 GB/s.
+- Grace LPDDR local STREAM: node0 329.1 GB/s, node1 323.1 GB/s. Caveat: CPU governor was `ondemand` and THP was `madvise`; no sudo available to tune.
+- Inter-Grace STREAM: L1->L0 113.1 GB/s, L0->L1 119.1 GB/s.
+- Local C2C host-to-device CE: L0->H0 362.7 GB/s, L1->H1 380.4 GB/s.
+- Cross-socket host-to-device CE: L0->H1 133.2 GB/s, L1->H0 133.2 GB/s.
+- Local C2C device-to-host CE: H0->L0 297.2 GB/s, H1->L1 297.5 GB/s.
+- Cross-socket device-to-host CE: H1->L0 132.6 GB/s, H0->L1 132.5 GB/s.
+- Cross-GPU sustained 16 MiB chunks: H0->H1 58.2 GB/s, H1->H0 57.9 GB/s. NVBandwidth D2D CE tests were waived on this SYS topology.
+- Managed alternating CPU/GPU access is very slow: 18.1-29.3 GB/s depending on GPU/host node.
+- Unregistered NUMA system memory is accessible and measured similarly to the NUMA-pinned host path: local about 331-339 GB/s, remote about 221 GB/s in the custom read+write kernel.
+- mixbench max observed SP: GPU0 60.9 TFLOP/s, GPU1 60.5 TFLOP/s; max observed bandwidth in mixbench: GPU0 3048 GB/s, GPU1 2952 GB/s.
+- Tuned STREAM with CPU governor `performance` and THP `always`: node0 72-thread Triad 330.3 GB/s, node1 72-thread Triad 328.0 GB/s. This is a modest improvement over the original 329.1/323.1 GB/s, but still below NVIDIA's 410-486 GB/s tuning-guide band.
+- Tuned STREAM best thread-count medians: node0 348.0 GB/s at 32 threads, node1 347.9 GB/s at 32 threads. Higher thread counts were slower despite tuning.
+- Tuned interleaved STREAM improved materially: 255.1 GB/s versus 229.4 GB/s baseline.
+- Tuned cross-socket STREAM did not materially improve: node0 cores/node1 memory 112.2 GB/s; node1 cores/node0 memory 119.2 GB/s.
+- Tuned NVBandwidth host transfers were mostly unchanged by CPU governor/THP: H2D CE local L0->H0 369.5 GB/s and L1->H1 380.8 GB/s; D2H CE local H0->L0 297.8 GB/s and H1->L1 297.6 GB/s; remote legs remained about 132-133 GB/s.
+- 450 W locked-clock BabelStream HBM Triad medians: GPU0 3728.4 GB/s, GPU1 3723.6 GB/s.
+- 450 W locked-clock NVBandwidth device-local copy: GPU0 1802.3 GB/s, GPU1 1801.2 GB/s.
+- 450 W locked-clock NVBandwidth host transfers: H2D CE local L0->H0 376.6 GB/s and L1->H1 380.2 GB/s; D2H CE local H0->L0 297.1 GB/s and H1->L1 297.6 GB/s; remote legs remained about 132-133 GB/s.
+- 450 W locked-clock sustained cross-GPU 16 MiB chunks: H0->H1 58.0 GB/s, H1->H0 57.4 GB/s, still matching the SYS-topology limitation rather than a clock/power limit.
+- Additional NVBandwidth bidirectional CE host/device pressure: local legs about 178.8-189.5 GB/s, remote legs about 123.3-124.6 GB/s, aggregate about 302-314 GB/s depending direction and host NUMA binding.
+- Additional NVBandwidth bidirectional SM host/device pressure: local legs about 203.3-204.1 GB/s, remote legs about 105.6-105.9 GB/s, aggregate about 309-310 GB/s.
+- Additional NVBandwidth host contention: `all_to_host_memcpy_ce` aggregates about 364-366 GB/s; `host_to_all_memcpy_ce` aggregates about 380 GB/s.
+- Additional NVBandwidth host/device SM latency: local C2C about 618-624 ns; remote host-to-GPU path about 987-991 ns.
+- Additional NVBandwidth buffer sweep: 16 MiB transfers are lower, but by 512-2048 MiB H2D CE reaches about 381-382 GB/s local and 133 GB/s remote; D2H CE reaches about 297-298 GB/s local and 132-133 GB/s remote.
+- Additional NVBandwidth huge-page variants completed without sudo and were essentially unchanged versus default pinned host transfers: H2D CE local about 379-381 GB/s, D2H CE local about 297 GB/s, remote about 132-134 GB/s.
+- `nvidia-smi topo -p2p n` reports GPU0<->GPU1 as `NS`; the additional NVBandwidth device-to-device latency and all-to-one/one-to-all peer tests were waived on this topology.
+
+## Pending Steps
+
+- Completed: reran STREAM and primary NVBandwidth host-transfer tests after enabling CPU governor `performance` and THP `always`.
+- Optional: collect a sampled `thermal-log.txt` during a longer rerun; static before/after snapshots were captured for the additional NVBandwidth suite.
+- Optional: improve `summary.md` de-duplication for CE vs SM NVBandwidth rows.
+- Not possible with this NVBandwidth/topology combination: NVBandwidth D2D CE read/write measurements for `H0->H1` and `H1->H0`; v0.9 waived those tests on SYS topology, so custom sustained copy results are used instead.
+
+## Notes
+
+- The benchmark runner should append progress here as it executes.
+- Raw outputs should live under `~/gh200-bench/run-YYYYMMDD-HHMMSS/`.
+- 2026-04-25 13:39:04 CEST: Using RUN_DIR=/home/grace/gh200-bench/smoke-20260425-133904
+- 2026-04-25 13:39:04 CEST: Smoke test started
+- 2026-04-25 13:39:05 CEST: Captured system info
+- 2026-04-25 13:39:05 CEST: Detected GPU NUMA mapping: GPU_0_NODE=0 GPU_1_NODE=1
+- 2026-04-25 13:39:05 CEST: Smoke NVBandwidth skipped: binary unavailable
+- 2026-04-25 13:39:05 CEST: Smoke STREAM skipped: binary unavailable
+- 2026-04-25 13:39:05 CEST: Smoke BabelStream skipped: binary unavailable
+- 2026-04-25 13:39:05 CEST: Smoke decision written to /home/grace/gh200-bench/smoke-20260425-133904/decision.txt
+- 2026-04-25 13:39:05 CEST: Smoke test finished
+- 2026-04-25 13:45:19 CEST: Using RUN_DIR=/home/grace/gh200-bench/smoke-20260425-134519
+- 2026-04-25 13:45:19 CEST: Smoke test started
+- 2026-04-25 13:45:20 CEST: Captured system info
+- 2026-04-25 13:45:20 CEST: Detected GPU NUMA mapping: GPU_0_NODE=0 GPU_1_NODE=1
+- 2026-04-25 13:45:22 CEST: Smoke NVBandwidth host_to_device_memcpy_ce complete
+- 2026-04-25 13:45:23 CEST: Smoke NVBandwidth device_to_device_memcpy_read_ce complete
+- 2026-04-25 13:45:25 CEST: Smoke STREAM node 0 complete
+- 2026-04-25 13:45:28 CEST: Smoke STREAM node 1 complete
+- 2026-04-25 13:45:30 CEST: Smoke BabelStream GPU0 complete
+- 2026-04-25 13:45:32 CEST: Smoke BabelStream GPU1 complete
+- 2026-04-25 13:45:32 CEST: Smoke decision written to /home/grace/gh200-bench/smoke-20260425-134519/decision.txt
+- 2026-04-25 13:45:32 CEST: Smoke test finished
+- 2026-04-25 13:46:20 CEST: Using RUN_DIR=/home/grace/gh200-bench/run-20260425-134620
+- 2026-04-25 13:46:20 CEST: Full benchmark runner started
+- 2026-04-25 13:46:20 CEST: Detected GPU NUMA mapping: GPU_0_NODE=0 GPU_1_NODE=1
+- 2026-04-25 13:46:21 CEST: Captured system info
+- 2026-04-25 13:46:21 CEST: SECTION install_tools
+- 2026-04-25 13:46:22 CEST: START build nvbandwidth
+- 2026-04-25 13:46:38 CEST: Using RUN_DIR=/home/grace/gh200-bench/run-20260425-134620
+- 2026-04-25 13:46:38 CEST: Full benchmark runner started
+- 2026-04-25 13:46:38 CEST: Detected GPU NUMA mapping: GPU_0_NODE=0 GPU_1_NODE=1
+- 2026-04-25 13:46:39 CEST: Captured system info
+- 2026-04-25 13:46:39 CEST: SECTION install_tools
+- 2026-04-25 13:46:39 CEST: START build nvbandwidth
+- 2026-04-25 13:46:40 CEST: DONE build nvbandwidth -> /home/grace/gh200-bench/run-20260425-134620/results/install_nvbandwidth_build.txt
+- 2026-04-25 13:46:40 CEST: START build STREAM
+- 2026-04-25 13:46:40 CEST: DONE build STREAM -> /home/grace/gh200-bench/run-20260425-134620/results/install_stream_build.txt
+- 2026-04-25 13:46:40 CEST: START configure BabelStream
+- 2026-04-25 13:46:40 CEST: DONE configure BabelStream -> /home/grace/gh200-bench/run-20260425-134620/results/install_babelstream_configure.txt
+- 2026-04-25 13:46:40 CEST: START build BabelStream
+- 2026-04-25 13:46:40 CEST: DONE build BabelStream -> /home/grace/gh200-bench/run-20260425-134620/results/install_babelstream_build.txt
+- 2026-04-25 13:46:40 CEST: START build mixbench
+- 2026-04-25 13:46:40 CEST: DONE build mixbench -> /home/grace/gh200-bench/run-20260425-134620/results/install_mixbench_build.txt
+- 2026-04-25 13:46:40 CEST: SECTION DONE install_tools
+- 2026-04-25 13:46:40 CEST: SECTION build_custom_kernels
+- 2026-04-25 13:46:40 CEST: START build memory_modes
+- 2026-04-25 13:46:42 CEST: DONE build memory_modes -> /home/grace/gh200-bench/run-20260425-134620/results/build_memory_modes.txt
+- 2026-04-25 13:46:42 CEST: START build latency_probe
+- 2026-04-25 13:46:44 CEST: DONE build latency_probe -> /home/grace/gh200-bench/run-20260425-134620/results/build_latency_probe.txt
+- 2026-04-25 13:46:44 CEST: START build sustained
+- 2026-04-25 13:46:46 CEST: DONE build sustained -> /home/grace/gh200-bench/run-20260425-134620/results/build_sustained.txt
+- 2026-04-25 13:46:46 CEST: SECTION DONE build_custom_kernels
+- 2026-04-25 13:46:46 CEST: SECTION nvbandwidth
+- 2026-04-25 13:46:48 CEST: NVBandwidth host_to_device_memcpy_ce host_on_node0 complete
+- 2026-04-25 13:46:50 CEST: NVBandwidth host_to_device_memcpy_ce host_on_node1 complete
+- 2026-04-25 13:46:51 CEST: NVBandwidth device_to_host_memcpy_ce host_on_node0 complete
+- 2026-04-25 13:46:53 CEST: NVBandwidth device_to_host_memcpy_ce host_on_node1 complete
+- 2026-04-25 13:46:54 CEST: NVBandwidth host_to_device_memcpy_sm host_on_node0 complete
+- 2026-04-25 13:46:56 CEST: NVBandwidth host_to_device_memcpy_sm host_on_node1 complete
+- 2026-04-25 13:46:57 CEST: NVBandwidth device_to_host_memcpy_sm host_on_node0 complete
+- 2026-04-25 13:46:59 CEST: NVBandwidth device_to_host_memcpy_sm host_on_node1 complete
+- 2026-04-25 13:47:00 CEST: NVBandwidth device_to_device_memcpy_read_ce complete
+- 2026-04-25 13:47:00 CEST: NVBandwidth device_to_device_memcpy_write_ce complete
+- 2026-04-25 13:47:02 CEST: NVBandwidth device_local_copy complete
+- 2026-04-25 13:47:02 CEST: SECTION DONE nvbandwidth
+- 2026-04-25 13:47:07 CEST: SECTION stream
+- 2026-04-25 13:47:11 CEST: STREAM node=0 threads=8 run=1 complete
+- 2026-04-25 13:47:15 CEST: STREAM node=0 threads=8 run=2 complete
+- 2026-04-25 13:47:20 CEST: STREAM node=0 threads=8 run=3 complete
+- 2026-04-25 13:47:24 CEST: STREAM node=0 threads=16 run=1 complete
+- 2026-04-25 13:47:28 CEST: STREAM node=0 threads=16 run=2 complete
+- 2026-04-25 13:47:32 CEST: STREAM node=0 threads=16 run=3 complete
+- 2026-04-25 13:47:35 CEST: STREAM node=0 threads=32 run=1 complete
+- 2026-04-25 13:47:39 CEST: STREAM node=0 threads=32 run=2 complete
+- 2026-04-25 13:47:42 CEST: STREAM node=0 threads=32 run=3 complete
+- 2026-04-25 13:47:46 CEST: STREAM node=0 threads=48 run=1 complete
+- 2026-04-25 13:47:50 CEST: STREAM node=0 threads=48 run=2 complete
+- 2026-04-25 13:47:53 CEST: STREAM node=0 threads=48 run=3 complete
+- 2026-04-25 13:47:57 CEST: STREAM node=0 threads=64 run=1 complete
+- 2026-04-25 13:48:01 CEST: STREAM node=0 threads=64 run=2 complete
+- 2026-04-25 13:48:05 CEST: STREAM node=0 threads=64 run=3 complete
+- 2026-04-25 13:48:08 CEST: STREAM node=0 threads=72 run=1 complete
+- 2026-04-25 13:48:12 CEST: STREAM node=0 threads=72 run=2 complete
+- 2026-04-25 13:48:16 CEST: STREAM node=0 threads=72 run=3 complete
+- 2026-04-25 13:48:21 CEST: STREAM node=1 threads=8 run=1 complete
+- 2026-04-25 13:48:26 CEST: STREAM node=1 threads=8 run=2 complete
+- 2026-04-25 13:48:31 CEST: STREAM node=1 threads=8 run=3 complete
+- 2026-04-25 13:48:34 CEST: STREAM node=1 threads=16 run=1 complete
+- 2026-04-25 13:48:38 CEST: STREAM node=1 threads=16 run=2 complete
+- 2026-04-25 13:48:42 CEST: STREAM node=1 threads=16 run=3 complete
+- 2026-04-25 13:48:46 CEST: STREAM node=1 threads=32 run=1 complete
+- 2026-04-25 13:48:49 CEST: STREAM node=1 threads=32 run=2 complete
+- 2026-04-25 13:48:53 CEST: STREAM node=1 threads=32 run=3 complete
+- 2026-04-25 13:48:56 CEST: STREAM node=1 threads=48 run=1 complete
+- 2026-04-25 13:49:00 CEST: STREAM node=1 threads=48 run=2 complete
+- 2026-04-25 13:49:04 CEST: STREAM node=1 threads=48 run=3 complete
+- 2026-04-25 13:49:07 CEST: STREAM node=1 threads=64 run=1 complete
+- 2026-04-25 13:49:11 CEST: STREAM node=1 threads=64 run=2 complete
+- 2026-04-25 13:49:15 CEST: STREAM node=1 threads=64 run=3 complete
+- 2026-04-25 13:49:18 CEST: STREAM node=1 threads=72 run=1 complete
+- 2026-04-25 13:49:22 CEST: STREAM node=1 threads=72 run=2 complete
+- 2026-04-25 13:49:26 CEST: STREAM node=1 threads=72 run=3 complete
+- 2026-04-25 13:49:44 CEST: STREAM cross/interleave run=1 complete
+- 2026-04-25 13:50:01 CEST: STREAM cross/interleave run=2 complete
+- 2026-04-25 13:50:18 CEST: STREAM cross/interleave run=3 complete
+- 2026-04-25 13:50:18 CEST: SECTION DONE stream
+- 2026-04-25 13:50:23 CEST: SECTION babelstream
+- 2026-04-25 13:50:25 CEST: BabelStream gpu=0 run=1 complete
+- 2026-04-25 13:50:28 CEST: BabelStream gpu=0 run=2 complete
+- 2026-04-25 13:50:31 CEST: BabelStream gpu=0 run=3 complete
+- 2026-04-25 13:50:35 CEST: BabelStream gpu=1 run=1 complete
+- 2026-04-25 13:50:38 CEST: BabelStream gpu=1 run=2 complete
+- 2026-04-25 13:50:41 CEST: BabelStream gpu=1 run=3 complete
+- 2026-04-25 13:50:43 CEST: BabelStream size sweep size=16777216 complete
+- 2026-04-25 13:50:44 CEST: BabelStream size sweep size=67108864 complete
+- 2026-04-25 13:50:46 CEST: BabelStream size sweep size=268435456 complete
+- 2026-04-25 13:50:52 CEST: BabelStream size sweep size=1073741824 complete
+- 2026-04-25 13:50:52 CEST: SECTION DONE babelstream
+- 2026-04-25 13:50:57 CEST: SECTION memory_modes
+- 2026-04-25 13:51:00 CEST: memory_modes gpu=0 host_node=0 complete
+- 2026-04-25 13:51:04 CEST: memory_modes gpu=0 host_node=1 complete
+- 2026-04-25 13:51:08 CEST: memory_modes gpu=1 host_node=0 complete
+- 2026-04-25 13:51:12 CEST: memory_modes gpu=1 host_node=1 complete
+- 2026-04-25 13:51:13 CEST: SECTION DONE memory_modes
+- 2026-04-25 13:51:18 CEST: SECTION latency
+- 2026-04-25 13:51:19 CEST: latency mode=oneway_bw h0->h1 complete
+- 2026-04-25 13:51:20 CEST: latency mode=oneway_bw h0->l0 complete
+- 2026-04-25 13:51:20 CEST: latency mode=oneway_bw h0->l1 complete
+- 2026-04-25 13:51:21 CEST: latency mode=oneway_bw h1->h0 complete
+- 2026-04-25 13:51:22 CEST: latency mode=oneway_bw h1->l0 complete
+- 2026-04-25 13:51:23 CEST: latency mode=oneway_bw h1->l1 complete
+- 2026-04-25 13:51:24 CEST: latency mode=oneway_bw l0->h0 complete
+- 2026-04-25 13:51:25 CEST: latency mode=oneway_bw l0->h1 complete
+- 2026-04-25 13:51:26 CEST: latency mode=oneway_bw l0->l1 complete
+- 2026-04-25 13:51:27 CEST: latency mode=oneway_bw l1->h0 complete
+- 2026-04-25 13:51:28 CEST: latency mode=oneway_bw l1->h1 complete
+- 2026-04-25 13:51:30 CEST: latency mode=oneway_bw l1->l0 complete
+- 2026-04-25 13:51:31 CEST: latency mode=roundtrip_lat h0->h1 complete
+- 2026-04-25 13:51:32 CEST: latency mode=roundtrip_lat h0->l0 complete
+- 2026-04-25 13:51:33 CEST: latency mode=roundtrip_lat h0->l1 complete
+- 2026-04-25 13:51:35 CEST: latency mode=roundtrip_lat h1->h0 complete
+- 2026-04-25 13:51:36 CEST: latency mode=roundtrip_lat h1->l0 complete
+- 2026-04-25 13:51:37 CEST: latency mode=roundtrip_lat h1->l1 complete
+- 2026-04-25 13:51:38 CEST: latency mode=roundtrip_lat l0->h0 complete
+- 2026-04-25 13:51:39 CEST: latency mode=roundtrip_lat l0->h1 complete
+- 2026-04-25 13:51:42 CEST: latency mode=roundtrip_lat l0->l1 complete
+- 2026-04-25 13:51:43 CEST: latency mode=roundtrip_lat l1->h0 complete
+- 2026-04-25 13:51:44 CEST: latency mode=roundtrip_lat l1->h1 complete
+- 2026-04-25 13:51:48 CEST: latency mode=roundtrip_lat l1->l0 complete
+- 2026-04-25 13:51:48 CEST: SECTION DONE latency
+- 2026-04-25 13:51:53 CEST: SECTION mixbench
+- 2026-04-25 13:51:53 CEST: mixbench gpu=0 complete
+- 2026-04-25 13:51:54 CEST: mixbench gpu=1 complete
+- 2026-04-25 13:51:54 CEST: SECTION DONE mixbench
+- 2026-04-25 13:51:59 CEST: SECTION sustained
+- 2026-04-25 13:52:02 CEST: sustained h0->h1 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:04 CEST: sustained h0->h1 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:05 CEST: sustained h0->l0 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:05 CEST: sustained h0->l0 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:06 CEST: sustained h0->l1 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:07 CEST: sustained h0->l1 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:10 CEST: sustained h1->h0 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:12 CEST: sustained h1->h0 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:13 CEST: sustained h1->l0 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:14 CEST: sustained h1->l0 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:15 CEST: sustained h1->l1 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:16 CEST: sustained h1->l1 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:17 CEST: sustained l0->h0 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:18 CEST: sustained l0->h0 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:19 CEST: sustained l0->h1 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:20 CEST: sustained l0->h1 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:23 CEST: sustained l0->l1 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:29 CEST: sustained l0->l1 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:30 CEST: sustained l1->h0 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:31 CEST: sustained l1->h0 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:32 CEST: sustained l1->h1 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:33 CEST: sustained l1->h1 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:36 CEST: sustained l1->l0 chunk=1048576 chunks=65536 complete
+- 2026-04-25 13:52:41 CEST: sustained l1->l0 chunk=16777216 chunks=4096 complete
+- 2026-04-25 13:52:41 CEST: SECTION DONE sustained
+- 2026-04-25 13:52:41 CEST: SECTION analyze
+- 2026-04-25 13:52:42 CEST: Analysis complete; see /home/grace/gh200-bench/run-20260425-134620/analyze.log
+- 2026-04-25 13:52:42 CEST: SECTION DONE analyze
+- 2026-04-25 13:52:42 CEST: Full benchmark runner finished
+- 2026-04-25 14:07:49 CEST: Rerunning extended memory_modes section
+- 2026-04-25 14:07:59 CEST: extended memory_modes gpu=0 host_node=0 complete
+- 2026-04-25 14:08:12 CEST: extended memory_modes gpu=0 host_node=1 complete
+- 2026-04-25 14:08:25 CEST: extended memory_modes gpu=1 host_node=0 complete
+- 2026-04-25 14:08:36 CEST: extended memory_modes gpu=1 host_node=1 complete
+- 2026-04-25 14:17:04 CEST: SECTION additional_nvbandwidth started
+- 2026-04-25 14:17:04 CEST: NVBandwidth upstream check: built checkout is v0.9 4a49bda; origin/main has no newer commit as of fetch on 2026-04-25
+- 2026-04-25 14:17:04 CEST: Captured nvidia-smi topo -m
+- 2026-04-25 14:17:04 CEST: Captured nvidia-smi topo -p2p n
+- 2026-04-25 14:17:05 CEST: Captured thermal/power/clock snapshot before additional tests
+- 2026-04-25 14:17:05 CEST: START additional: NVBandwidth JSON all default
+- 2026-04-25 14:17:06 CEST: DONE additional: NVBandwidth JSON all default
+- 2026-04-25 14:17:07 CEST: START additional: NVBandwidth host_to_device_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:09 CEST: DONE additional: NVBandwidth host_to_device_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:10 CEST: START additional: NVBandwidth host_to_device_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:17:13 CEST: DONE additional: NVBandwidth host_to_device_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:17:14 CEST: START additional: NVBandwidth device_to_host_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:16 CEST: DONE additional: NVBandwidth device_to_host_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:17 CEST: START additional: NVBandwidth device_to_host_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:17:19 CEST: DONE additional: NVBandwidth device_to_host_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:17:20 CEST: START additional: NVBandwidth host_to_device_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:17:22 CEST: DONE additional: NVBandwidth host_to_device_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:17:23 CEST: START additional: NVBandwidth host_to_device_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:17:24 CEST: DONE additional: NVBandwidth host_to_device_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:17:25 CEST: START additional: NVBandwidth device_to_host_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:17:27 CEST: DONE additional: NVBandwidth device_to_host_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:17:28 CEST: START additional: NVBandwidth device_to_host_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:17:29 CEST: DONE additional: NVBandwidth device_to_host_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:17:30 CEST: START additional: NVBandwidth all_to_host_memcpy_ce host_on_node0
+- 2026-04-25 14:17:33 CEST: DONE additional: NVBandwidth all_to_host_memcpy_ce host_on_node0
+- 2026-04-25 14:17:34 CEST: START additional: NVBandwidth all_to_host_memcpy_ce host_on_node1
+- 2026-04-25 14:17:36 CEST: DONE additional: NVBandwidth all_to_host_memcpy_ce host_on_node1
+- 2026-04-25 14:17:37 CEST: START additional: NVBandwidth all_to_host_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:41 CEST: DONE additional: NVBandwidth all_to_host_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:42 CEST: START additional: NVBandwidth all_to_host_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:17:46 CEST: DONE additional: NVBandwidth all_to_host_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:17:47 CEST: START additional: NVBandwidth host_to_all_memcpy_ce host_on_node0
+- 2026-04-25 14:17:50 CEST: DONE additional: NVBandwidth host_to_all_memcpy_ce host_on_node0
+- 2026-04-25 14:17:51 CEST: START additional: NVBandwidth host_to_all_memcpy_ce host_on_node1
+- 2026-04-25 14:17:53 CEST: DONE additional: NVBandwidth host_to_all_memcpy_ce host_on_node1
+- 2026-04-25 14:17:54 CEST: START additional: NVBandwidth host_to_all_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:58 CEST: DONE additional: NVBandwidth host_to_all_bidirectional_memcpy_ce host_on_node0
+- 2026-04-25 14:17:59 CEST: START additional: NVBandwidth host_to_all_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:18:03 CEST: DONE additional: NVBandwidth host_to_all_bidirectional_memcpy_ce host_on_node1
+- 2026-04-25 14:18:04 CEST: START additional: NVBandwidth all_to_host_memcpy_sm host_on_node0
+- 2026-04-25 14:18:07 CEST: DONE additional: NVBandwidth all_to_host_memcpy_sm host_on_node0
+- 2026-04-25 14:18:08 CEST: START additional: NVBandwidth all_to_host_memcpy_sm host_on_node1
+- 2026-04-25 14:18:11 CEST: DONE additional: NVBandwidth all_to_host_memcpy_sm host_on_node1
+- 2026-04-25 14:18:12 CEST: START additional: NVBandwidth all_to_host_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:18:14 CEST: DONE additional: NVBandwidth all_to_host_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:18:15 CEST: START additional: NVBandwidth all_to_host_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:18:17 CEST: DONE additional: NVBandwidth all_to_host_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:18:18 CEST: START additional: NVBandwidth host_to_all_memcpy_sm host_on_node0
+- 2026-04-25 14:18:20 CEST: DONE additional: NVBandwidth host_to_all_memcpy_sm host_on_node0
+- 2026-04-25 14:18:21 CEST: START additional: NVBandwidth host_to_all_memcpy_sm host_on_node1
+- 2026-04-25 14:18:24 CEST: DONE additional: NVBandwidth host_to_all_memcpy_sm host_on_node1
+- 2026-04-25 14:18:25 CEST: START additional: NVBandwidth host_to_all_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:18:27 CEST: DONE additional: NVBandwidth host_to_all_bidirectional_memcpy_sm host_on_node0
+- 2026-04-25 14:18:28 CEST: START additional: NVBandwidth host_to_all_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:18:30 CEST: DONE additional: NVBandwidth host_to_all_bidirectional_memcpy_sm host_on_node1
+- 2026-04-25 14:18:31 CEST: START additional: NVBandwidth host_device_latency_sm host_on_node0
+- 2026-04-25 14:18:33 CEST: DONE additional: NVBandwidth host_device_latency_sm host_on_node0
+- 2026-04-25 14:18:34 CEST: START additional: NVBandwidth host_device_latency_sm host_on_node1
+- 2026-04-25 14:18:37 CEST: DONE additional: NVBandwidth host_device_latency_sm host_on_node1
+- 2026-04-25 14:18:38 CEST: START additional: NVBandwidth device_to_device_latency_sm
+- 2026-04-25 14:18:39 CEST: DONE additional: NVBandwidth device_to_device_latency_sm
+- 2026-04-25 14:18:40 CEST: START additional: NVBandwidth all_to_one_write_ce
+- 2026-04-25 14:18:40 CEST: DONE additional: NVBandwidth all_to_one_write_ce
+- 2026-04-25 14:18:41 CEST: START additional: NVBandwidth all_to_one_read_ce
+- 2026-04-25 14:18:42 CEST: DONE additional: NVBandwidth all_to_one_read_ce
+- 2026-04-25 14:18:43 CEST: START additional: NVBandwidth one_to_all_write_ce
+- 2026-04-25 14:18:44 CEST: DONE additional: NVBandwidth one_to_all_write_ce
+- 2026-04-25 14:18:45 CEST: START additional: NVBandwidth one_to_all_read_ce
+- 2026-04-25 14:18:46 CEST: DONE additional: NVBandwidth one_to_all_read_ce
+- 2026-04-25 14:18:47 CEST: START additional: NVBandwidth all_to_one_write_sm
+- 2026-04-25 14:18:48 CEST: DONE additional: NVBandwidth all_to_one_write_sm
+- 2026-04-25 14:18:49 CEST: START additional: NVBandwidth all_to_one_read_sm
+- 2026-04-25 14:18:50 CEST: DONE additional: NVBandwidth all_to_one_read_sm
+- 2026-04-25 14:18:51 CEST: START additional: NVBandwidth one_to_all_write_sm
+- 2026-04-25 14:18:52 CEST: DONE additional: NVBandwidth one_to_all_write_sm
+- 2026-04-25 14:18:53 CEST: START additional: NVBandwidth one_to_all_read_sm
+- 2026-04-25 14:18:54 CEST: DONE additional: NVBandwidth one_to_all_read_sm
+- 2026-04-25 14:18:55 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=16MiB host_on_node0
+- 2026-04-25 14:18:56 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=16MiB host_on_node0
+- 2026-04-25 14:18:57 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=16MiB host_on_node1
+- 2026-04-25 14:18:58 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=16MiB host_on_node1
+- 2026-04-25 14:18:59 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=16MiB host_on_node0
+- 2026-04-25 14:19:00 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=16MiB host_on_node0
+- 2026-04-25 14:19:01 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=16MiB host_on_node1
+- 2026-04-25 14:19:02 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=16MiB host_on_node1
+- 2026-04-25 14:19:03 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=64MiB host_on_node0
+- 2026-04-25 14:19:04 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=64MiB host_on_node0
+- 2026-04-25 14:19:05 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=64MiB host_on_node1
+- 2026-04-25 14:19:06 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=64MiB host_on_node1
+- 2026-04-25 14:19:07 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=64MiB host_on_node0
+- 2026-04-25 14:19:08 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=64MiB host_on_node0
+- 2026-04-25 14:19:09 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=64MiB host_on_node1
+- 2026-04-25 14:19:10 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=64MiB host_on_node1
+- 2026-04-25 14:19:11 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=512MiB host_on_node0
+- 2026-04-25 14:19:12 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=512MiB host_on_node0
+- 2026-04-25 14:19:13 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=512MiB host_on_node1
+- 2026-04-25 14:19:15 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=512MiB host_on_node1
+- 2026-04-25 14:19:16 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=512MiB host_on_node0
+- 2026-04-25 14:19:17 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=512MiB host_on_node0
+- 2026-04-25 14:19:18 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=512MiB host_on_node1
+- 2026-04-25 14:19:20 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=512MiB host_on_node1
+- 2026-04-25 14:19:21 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=2048MiB host_on_node0
+- 2026-04-25 14:19:24 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=2048MiB host_on_node0
+- 2026-04-25 14:19:25 CEST: START additional: NVBandwidth host_to_device_memcpy_ce buffer=2048MiB host_on_node1
+- 2026-04-25 14:19:28 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce buffer=2048MiB host_on_node1
+- 2026-04-25 14:19:29 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=2048MiB host_on_node0
+- 2026-04-25 14:19:32 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=2048MiB host_on_node0
+- 2026-04-25 14:19:33 CEST: START additional: NVBandwidth device_to_host_memcpy_ce buffer=2048MiB host_on_node1
+- 2026-04-25 14:19:37 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce buffer=2048MiB host_on_node1
+- 2026-04-25 14:19:38 CEST: START additional: NVBandwidth host_to_device_memcpy_ce hugepages host_on_node0
+- 2026-04-25 14:19:39 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce hugepages host_on_node0
+- 2026-04-25 14:19:40 CEST: START additional: NVBandwidth host_to_device_memcpy_ce hugepages host_on_node1
+- 2026-04-25 14:19:42 CEST: DONE additional: NVBandwidth host_to_device_memcpy_ce hugepages host_on_node1
+- 2026-04-25 14:19:43 CEST: START additional: NVBandwidth device_to_host_memcpy_ce hugepages host_on_node0
+- 2026-04-25 14:19:44 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce hugepages host_on_node0
+- 2026-04-25 14:19:45 CEST: START additional: NVBandwidth device_to_host_memcpy_ce hugepages host_on_node1
+- 2026-04-25 14:19:47 CEST: DONE additional: NVBandwidth device_to_host_memcpy_ce hugepages host_on_node1
+- 2026-04-25 14:19:48 CEST: Captured thermal/power/clock snapshot after additional tests
+- 2026-04-25 14:19:48 CEST: SECTION additional_nvbandwidth finished
+- 2026-04-25 14:51:58 CEST: SECTION tuned_performance_governor started
+- 2026-04-25 14:51:58 CEST: Captured tuned-run governor/THP/thermal context
+- 2026-04-25 14:51:58 CEST: START perf-governor: STREAM node=0 threads=8 run=1
+- 2026-04-25 14:52:02 CEST: DONE perf-governor: STREAM node=0 threads=8 run=1
+- 2026-04-25 14:52:03 CEST: START perf-governor: STREAM node=0 threads=8 run=2
+- 2026-04-25 14:52:07 CEST: DONE perf-governor: STREAM node=0 threads=8 run=2
+- 2026-04-25 14:52:08 CEST: START perf-governor: STREAM node=0 threads=8 run=3
+- 2026-04-25 14:52:11 CEST: DONE perf-governor: STREAM node=0 threads=8 run=3
+- 2026-04-25 14:52:12 CEST: START perf-governor: STREAM node=0 threads=16 run=1
+- 2026-04-25 14:52:15 CEST: DONE perf-governor: STREAM node=0 threads=16 run=1
+- 2026-04-25 14:52:16 CEST: START perf-governor: STREAM node=0 threads=16 run=2
+- 2026-04-25 14:52:19 CEST: DONE perf-governor: STREAM node=0 threads=16 run=2
+- 2026-04-25 14:52:20 CEST: START perf-governor: STREAM node=0 threads=16 run=3
+- 2026-04-25 14:52:23 CEST: DONE perf-governor: STREAM node=0 threads=16 run=3
+- 2026-04-25 14:52:24 CEST: START perf-governor: STREAM node=0 threads=32 run=1
+- 2026-04-25 14:52:27 CEST: DONE perf-governor: STREAM node=0 threads=32 run=1
+- 2026-04-25 14:52:28 CEST: START perf-governor: STREAM node=0 threads=32 run=2
+- 2026-04-25 14:52:30 CEST: DONE perf-governor: STREAM node=0 threads=32 run=2
+- 2026-04-25 14:52:31 CEST: START perf-governor: STREAM node=0 threads=32 run=3
+- 2026-04-25 14:52:34 CEST: DONE perf-governor: STREAM node=0 threads=32 run=3
+- 2026-04-25 14:52:35 CEST: START perf-governor: STREAM node=0 threads=48 run=1
+- 2026-04-25 14:52:38 CEST: DONE perf-governor: STREAM node=0 threads=48 run=1
+- 2026-04-25 14:52:39 CEST: START perf-governor: STREAM node=0 threads=48 run=2
+- 2026-04-25 14:52:41 CEST: DONE perf-governor: STREAM node=0 threads=48 run=2
+- 2026-04-25 14:52:42 CEST: START perf-governor: STREAM node=0 threads=48 run=3
+- 2026-04-25 14:52:45 CEST: DONE perf-governor: STREAM node=0 threads=48 run=3
+- 2026-04-25 14:52:46 CEST: START perf-governor: STREAM node=0 threads=64 run=1
+- 2026-04-25 14:52:49 CEST: DONE perf-governor: STREAM node=0 threads=64 run=1
+- 2026-04-25 14:52:50 CEST: START perf-governor: STREAM node=0 threads=64 run=2
+- 2026-04-25 14:52:53 CEST: DONE perf-governor: STREAM node=0 threads=64 run=2
+- 2026-04-25 14:52:54 CEST: START perf-governor: STREAM node=0 threads=64 run=3
+- 2026-04-25 14:52:57 CEST: DONE perf-governor: STREAM node=0 threads=64 run=3
+- 2026-04-25 14:52:58 CEST: START perf-governor: STREAM node=0 threads=72 run=1
+- 2026-04-25 14:53:01 CEST: DONE perf-governor: STREAM node=0 threads=72 run=1
+- 2026-04-25 14:53:02 CEST: START perf-governor: STREAM node=0 threads=72 run=2
+- 2026-04-25 14:53:05 CEST: DONE perf-governor: STREAM node=0 threads=72 run=2
+- 2026-04-25 14:53:06 CEST: START perf-governor: STREAM node=0 threads=72 run=3
+- 2026-04-25 14:53:09 CEST: DONE perf-governor: STREAM node=0 threads=72 run=3
+- 2026-04-25 14:53:10 CEST: START perf-governor: STREAM node=1 threads=8 run=1
+- 2026-04-25 14:53:14 CEST: DONE perf-governor: STREAM node=1 threads=8 run=1
+- 2026-04-25 14:53:15 CEST: START perf-governor: STREAM node=1 threads=8 run=2
+- 2026-04-25 14:53:19 CEST: DONE perf-governor: STREAM node=1 threads=8 run=2
+- 2026-04-25 14:53:20 CEST: START perf-governor: STREAM node=1 threads=8 run=3
+- 2026-04-25 14:53:24 CEST: DONE perf-governor: STREAM node=1 threads=8 run=3
+- 2026-04-25 14:53:25 CEST: START perf-governor: STREAM node=1 threads=16 run=1
+- 2026-04-25 14:53:28 CEST: DONE perf-governor: STREAM node=1 threads=16 run=1
+- 2026-04-25 14:53:29 CEST: START perf-governor: STREAM node=1 threads=16 run=2
+- 2026-04-25 14:53:32 CEST: DONE perf-governor: STREAM node=1 threads=16 run=2
+- 2026-04-25 14:53:33 CEST: START perf-governor: STREAM node=1 threads=16 run=3
+- 2026-04-25 14:53:36 CEST: DONE perf-governor: STREAM node=1 threads=16 run=3
+- 2026-04-25 14:53:37 CEST: START perf-governor: STREAM node=1 threads=32 run=1
+- 2026-04-25 14:53:39 CEST: DONE perf-governor: STREAM node=1 threads=32 run=1
+- 2026-04-25 14:53:40 CEST: START perf-governor: STREAM node=1 threads=32 run=2
+- 2026-04-25 14:53:43 CEST: DONE perf-governor: STREAM node=1 threads=32 run=2
+- 2026-04-25 14:53:44 CEST: START perf-governor: STREAM node=1 threads=32 run=3
+- 2026-04-25 14:53:46 CEST: DONE perf-governor: STREAM node=1 threads=32 run=3
+- 2026-04-25 14:53:47 CEST: START perf-governor: STREAM node=1 threads=48 run=1
+- 2026-04-25 14:53:50 CEST: DONE perf-governor: STREAM node=1 threads=48 run=1
+- 2026-04-25 14:53:51 CEST: START perf-governor: STREAM node=1 threads=48 run=2
+- 2026-04-25 14:53:54 CEST: DONE perf-governor: STREAM node=1 threads=48 run=2
+- 2026-04-25 14:53:55 CEST: START perf-governor: STREAM node=1 threads=48 run=3
+- 2026-04-25 14:53:58 CEST: DONE perf-governor: STREAM node=1 threads=48 run=3
+- 2026-04-25 14:53:59 CEST: START perf-governor: STREAM node=1 threads=64 run=1
+- 2026-04-25 14:54:02 CEST: DONE perf-governor: STREAM node=1 threads=64 run=1
+- 2026-04-25 14:54:03 CEST: START perf-governor: STREAM node=1 threads=64 run=2
+- 2026-04-25 14:54:06 CEST: DONE perf-governor: STREAM node=1 threads=64 run=2
+- 2026-04-25 14:54:07 CEST: START perf-governor: STREAM node=1 threads=64 run=3
+- 2026-04-25 14:54:10 CEST: DONE perf-governor: STREAM node=1 threads=64 run=3
+- 2026-04-25 14:54:11 CEST: START perf-governor: STREAM node=1 threads=72 run=1
+- 2026-04-25 14:54:14 CEST: DONE perf-governor: STREAM node=1 threads=72 run=1
+- 2026-04-25 14:54:15 CEST: START perf-governor: STREAM node=1 threads=72 run=2
+- 2026-04-25 14:54:18 CEST: DONE perf-governor: STREAM node=1 threads=72 run=2
+- 2026-04-25 14:54:19 CEST: START perf-governor: STREAM node=1 threads=72 run=3
+- 2026-04-25 14:54:41 CEST: Superseded partial tuned_performance_governor run because THP changed from madvise to always during execution; do not use /home/grace/gh200-bench/run-20260425-134620/results/tuned_performance_governor as a publishable tuned run.
+- 2026-04-25 14:55:09 CEST: SECTION tuned_performance_thp_always started
+- 2026-04-25 14:55:09 CEST: Captured perf+thp context
+- 2026-04-25 14:55:09 CEST: START perf+thp: STREAM node=0 threads=8 run=1
+- 2026-04-25 14:55:12 CEST: DONE perf+thp: STREAM node=0 threads=8 run=1
+- 2026-04-25 14:55:13 CEST: START perf+thp: STREAM node=0 threads=8 run=2
+- 2026-04-25 14:55:17 CEST: DONE perf+thp: STREAM node=0 threads=8 run=2
+- 2026-04-25 14:55:18 CEST: START perf+thp: STREAM node=0 threads=8 run=3
+- 2026-04-25 14:55:22 CEST: DONE perf+thp: STREAM node=0 threads=8 run=3
+- 2026-04-25 14:55:23 CEST: START perf+thp: STREAM node=0 threads=16 run=1
+- 2026-04-25 14:55:26 CEST: DONE perf+thp: STREAM node=0 threads=16 run=1
+- 2026-04-25 14:55:27 CEST: START perf+thp: STREAM node=0 threads=16 run=2
+- 2026-04-25 14:55:30 CEST: DONE perf+thp: STREAM node=0 threads=16 run=2
+- 2026-04-25 14:55:31 CEST: START perf+thp: STREAM node=0 threads=16 run=3
+- 2026-04-25 14:55:34 CEST: DONE perf+thp: STREAM node=0 threads=16 run=3
+- 2026-04-25 14:55:35 CEST: START perf+thp: STREAM node=0 threads=32 run=1
+- 2026-04-25 14:55:37 CEST: DONE perf+thp: STREAM node=0 threads=32 run=1
+- 2026-04-25 14:55:38 CEST: START perf+thp: STREAM node=0 threads=32 run=2
+- 2026-04-25 14:55:41 CEST: DONE perf+thp: STREAM node=0 threads=32 run=2
+- 2026-04-25 14:55:42 CEST: START perf+thp: STREAM node=0 threads=32 run=3
+- 2026-04-25 14:55:45 CEST: DONE perf+thp: STREAM node=0 threads=32 run=3
+- 2026-04-25 14:55:46 CEST: START perf+thp: STREAM node=0 threads=48 run=1
+- 2026-04-25 14:55:48 CEST: DONE perf+thp: STREAM node=0 threads=48 run=1
+- 2026-04-25 14:55:49 CEST: START perf+thp: STREAM node=0 threads=48 run=2
+- 2026-04-25 14:55:52 CEST: DONE perf+thp: STREAM node=0 threads=48 run=2
+- 2026-04-25 14:55:53 CEST: START perf+thp: STREAM node=0 threads=48 run=3
+- 2026-04-25 14:55:56 CEST: DONE perf+thp: STREAM node=0 threads=48 run=3
+- 2026-04-25 14:55:57 CEST: START perf+thp: STREAM node=0 threads=64 run=1
+- 2026-04-25 14:56:00 CEST: DONE perf+thp: STREAM node=0 threads=64 run=1
+- 2026-04-25 14:56:01 CEST: START perf+thp: STREAM node=0 threads=64 run=2
+- 2026-04-25 14:56:04 CEST: DONE perf+thp: STREAM node=0 threads=64 run=2
+- 2026-04-25 14:56:05 CEST: START perf+thp: STREAM node=0 threads=64 run=3
+- 2026-04-25 14:56:08 CEST: DONE perf+thp: STREAM node=0 threads=64 run=3
+- 2026-04-25 14:56:09 CEST: START perf+thp: STREAM node=0 threads=72 run=1
+- 2026-04-25 14:56:12 CEST: DONE perf+thp: STREAM node=0 threads=72 run=1
+- 2026-04-25 14:56:13 CEST: START perf+thp: STREAM node=0 threads=72 run=2
+- 2026-04-25 14:56:16 CEST: DONE perf+thp: STREAM node=0 threads=72 run=2
+- 2026-04-25 14:56:17 CEST: START perf+thp: STREAM node=0 threads=72 run=3
+- 2026-04-25 14:56:20 CEST: DONE perf+thp: STREAM node=0 threads=72 run=3
+- 2026-04-25 14:56:21 CEST: START perf+thp: STREAM node=1 threads=8 run=1
+- 2026-04-25 14:56:25 CEST: DONE perf+thp: STREAM node=1 threads=8 run=1
+- 2026-04-25 14:56:26 CEST: START perf+thp: STREAM node=1 threads=8 run=2
+- 2026-04-25 14:56:30 CEST: DONE perf+thp: STREAM node=1 threads=8 run=2
+- 2026-04-25 14:56:31 CEST: START perf+thp: STREAM node=1 threads=8 run=3
+- 2026-04-25 14:56:35 CEST: DONE perf+thp: STREAM node=1 threads=8 run=3
+- 2026-04-25 14:56:36 CEST: START perf+thp: STREAM node=1 threads=16 run=1
+- 2026-04-25 14:56:39 CEST: DONE perf+thp: STREAM node=1 threads=16 run=1
+- 2026-04-25 14:56:40 CEST: START perf+thp: STREAM node=1 threads=16 run=2
+- 2026-04-25 14:56:43 CEST: DONE perf+thp: STREAM node=1 threads=16 run=2
+- 2026-04-25 14:56:44 CEST: START perf+thp: STREAM node=1 threads=16 run=3
+- 2026-04-25 14:56:47 CEST: DONE perf+thp: STREAM node=1 threads=16 run=3
+- 2026-04-25 14:56:48 CEST: START perf+thp: STREAM node=1 threads=32 run=1
+- 2026-04-25 14:56:50 CEST: DONE perf+thp: STREAM node=1 threads=32 run=1
+- 2026-04-25 14:56:51 CEST: START perf+thp: STREAM node=1 threads=32 run=2
+- 2026-04-25 14:56:54 CEST: DONE perf+thp: STREAM node=1 threads=32 run=2
+- 2026-04-25 14:56:55 CEST: START perf+thp: STREAM node=1 threads=32 run=3
+- 2026-04-25 14:56:57 CEST: DONE perf+thp: STREAM node=1 threads=32 run=3
+- 2026-04-25 14:56:58 CEST: START perf+thp: STREAM node=1 threads=48 run=1
+- 2026-04-25 14:57:01 CEST: DONE perf+thp: STREAM node=1 threads=48 run=1
+- 2026-04-25 14:57:02 CEST: START perf+thp: STREAM node=1 threads=48 run=2
+- 2026-04-25 14:57:05 CEST: DONE perf+thp: STREAM node=1 threads=48 run=2
+- 2026-04-25 14:57:06 CEST: START perf+thp: STREAM node=1 threads=48 run=3
+- 2026-04-25 14:57:09 CEST: DONE perf+thp: STREAM node=1 threads=48 run=3
+- 2026-04-25 14:57:10 CEST: START perf+thp: STREAM node=1 threads=64 run=1
+- 2026-04-25 14:57:13 CEST: DONE perf+thp: STREAM node=1 threads=64 run=1
+- 2026-04-25 14:57:14 CEST: START perf+thp: STREAM node=1 threads=64 run=2
+- 2026-04-25 14:57:17 CEST: DONE perf+thp: STREAM node=1 threads=64 run=2
+- 2026-04-25 14:57:18 CEST: START perf+thp: STREAM node=1 threads=64 run=3
+- 2026-04-25 14:57:21 CEST: DONE perf+thp: STREAM node=1 threads=64 run=3
+- 2026-04-25 14:57:22 CEST: START perf+thp: STREAM node=1 threads=72 run=1
+- 2026-04-25 14:57:25 CEST: DONE perf+thp: STREAM node=1 threads=72 run=1
+- 2026-04-25 14:57:26 CEST: START perf+thp: STREAM node=1 threads=72 run=2
+- 2026-04-25 14:57:29 CEST: DONE perf+thp: STREAM node=1 threads=72 run=2
+- 2026-04-25 14:57:30 CEST: START perf+thp: STREAM node=1 threads=72 run=3
+- 2026-04-25 14:57:33 CEST: DONE perf+thp: STREAM node=1 threads=72 run=3
+- 2026-04-25 14:57:34 CEST: START perf+thp: STREAM cross n0cores_n1mem run=1
+- 2026-04-25 14:57:43 CEST: DONE perf+thp: STREAM cross n0cores_n1mem run=1
+- 2026-04-25 14:57:44 CEST: START perf+thp: STREAM cross n1cores_n0mem run=1
+- 2026-04-25 14:57:52 CEST: DONE perf+thp: STREAM cross n1cores_n0mem run=1
+- 2026-04-25 14:57:53 CEST: START perf+thp: STREAM both interleave run=1
+- 2026-04-25 14:57:57 CEST: DONE perf+thp: STREAM both interleave run=1
+- 2026-04-25 14:57:58 CEST: START perf+thp: STREAM cross n0cores_n1mem run=2
+- 2026-04-25 14:58:07 CEST: DONE perf+thp: STREAM cross n0cores_n1mem run=2
+- 2026-04-25 14:58:08 CEST: START perf+thp: STREAM cross n1cores_n0mem run=2
+- 2026-04-25 14:58:16 CEST: DONE perf+thp: STREAM cross n1cores_n0mem run=2
+- 2026-04-25 14:58:17 CEST: START perf+thp: STREAM both interleave run=2
+- 2026-04-25 14:58:21 CEST: DONE perf+thp: STREAM both interleave run=2
+- 2026-04-25 14:58:22 CEST: START perf+thp: STREAM cross n0cores_n1mem run=3
+- 2026-04-25 14:58:30 CEST: DONE perf+thp: STREAM cross n0cores_n1mem run=3
+- 2026-04-25 14:58:31 CEST: START perf+thp: STREAM cross n1cores_n0mem run=3
+- 2026-04-25 14:58:39 CEST: DONE perf+thp: STREAM cross n1cores_n0mem run=3
+- 2026-04-25 14:58:40 CEST: START perf+thp: STREAM both interleave run=3
+- 2026-04-25 14:58:44 CEST: DONE perf+thp: STREAM both interleave run=3
+- 2026-04-25 14:58:45 CEST: START perf+thp: NVBandwidth host_to_device_memcpy_ce host_on_node0
+- 2026-04-25 14:58:47 CEST: DONE perf+thp: NVBandwidth host_to_device_memcpy_ce host_on_node0
+- 2026-04-25 14:58:48 CEST: START perf+thp: NVBandwidth host_to_device_memcpy_ce host_on_node1
+- 2026-04-25 14:58:49 CEST: DONE perf+thp: NVBandwidth host_to_device_memcpy_ce host_on_node1
+- 2026-04-25 14:58:50 CEST: START perf+thp: NVBandwidth device_to_host_memcpy_ce host_on_node0
+- 2026-04-25 14:58:51 CEST: DONE perf+thp: NVBandwidth device_to_host_memcpy_ce host_on_node0
+- 2026-04-25 14:58:52 CEST: START perf+thp: NVBandwidth device_to_host_memcpy_ce host_on_node1
+- 2026-04-25 14:58:54 CEST: DONE perf+thp: NVBandwidth device_to_host_memcpy_ce host_on_node1
+- 2026-04-25 14:58:55 CEST: START perf+thp: NVBandwidth host_to_device_memcpy_sm host_on_node0
+- 2026-04-25 14:58:56 CEST: DONE perf+thp: NVBandwidth host_to_device_memcpy_sm host_on_node0
+- 2026-04-25 14:58:57 CEST: START perf+thp: NVBandwidth host_to_device_memcpy_sm host_on_node1
+- 2026-04-25 14:58:58 CEST: DONE perf+thp: NVBandwidth host_to_device_memcpy_sm host_on_node1
+- 2026-04-25 14:58:59 CEST: START perf+thp: NVBandwidth device_to_host_memcpy_sm host_on_node0
+- 2026-04-25 14:59:01 CEST: DONE perf+thp: NVBandwidth device_to_host_memcpy_sm host_on_node0
+- 2026-04-25 14:59:02 CEST: START perf+thp: NVBandwidth device_to_host_memcpy_sm host_on_node1
+- 2026-04-25 14:59:03 CEST: DONE perf+thp: NVBandwidth device_to_host_memcpy_sm host_on_node1
+- 2026-04-25 14:59:04 CEST: Captured perf+thp thermal context after tests
+- 2026-04-25 14:59:04 CEST: SECTION tuned_performance_thp_always finished
+- 2026-04-25 15:05:15 CEST: SECTION tuned_450w_locked_clocks started
+- 2026-04-25 15:05:15 CEST: Captured 450w locked-clock context
+- 2026-04-25 15:05:15 CEST: START 450w: BabelStream gpu=0 run=1
+- 2026-04-25 15:05:22 CEST: DONE 450w: BabelStream gpu=0 run=1
+- 2026-04-25 15:05:23 CEST: START 450w: BabelStream gpu=0 run=2
+- 2026-04-25 15:05:30 CEST: DONE 450w: BabelStream gpu=0 run=2
+- 2026-04-25 15:05:31 CEST: START 450w: BabelStream gpu=0 run=3
+- 2026-04-25 15:05:37 CEST: DONE 450w: BabelStream gpu=0 run=3
+- 2026-04-25 15:05:38 CEST: START 450w: BabelStream gpu=1 run=1
+- 2026-04-25 15:05:46 CEST: DONE 450w: BabelStream gpu=1 run=1
+- 2026-04-25 15:05:47 CEST: START 450w: BabelStream gpu=1 run=2
+- 2026-04-25 15:05:56 CEST: DONE 450w: BabelStream gpu=1 run=2
+- 2026-04-25 15:05:57 CEST: START 450w: BabelStream gpu=1 run=3
+- 2026-04-25 15:06:05 CEST: DONE 450w: BabelStream gpu=1 run=3
+- 2026-04-25 15:06:06 CEST: START 450w: BabelStream gpu0 size=16777216
+- 2026-04-25 15:06:06 CEST: DONE 450w: BabelStream gpu0 size=16777216
+- 2026-04-25 15:06:07 CEST: START 450w: BabelStream gpu0 size=67108864
+- 2026-04-25 15:06:08 CEST: DONE 450w: BabelStream gpu0 size=67108864
+- 2026-04-25 15:06:09 CEST: START 450w: BabelStream gpu0 size=268435456
+- 2026-04-25 15:06:11 CEST: DONE 450w: BabelStream gpu0 size=268435456
+- 2026-04-25 15:06:12 CEST: START 450w: BabelStream gpu0 size=1073741824
+- 2026-04-25 15:06:19 CEST: DONE 450w: BabelStream gpu0 size=1073741824
+- 2026-04-25 15:06:20 CEST: START 450w: memory_modes gpu=0 host=0
+- 2026-04-25 15:06:30 CEST: DONE 450w: memory_modes gpu=0 host=0
+- 2026-04-25 15:06:31 CEST: START 450w: memory_modes gpu=0 host=1
+- 2026-04-25 15:06:42 CEST: DONE 450w: memory_modes gpu=0 host=1
+- 2026-04-25 15:06:43 CEST: START 450w: memory_modes gpu=1 host=0
+- 2026-04-25 15:06:56 CEST: DONE 450w: memory_modes gpu=1 host=0
+- 2026-04-25 15:06:57 CEST: START 450w: memory_modes gpu=1 host=1
+- 2026-04-25 15:07:08 CEST: DONE 450w: memory_modes gpu=1 host=1
+- 2026-04-25 15:07:09 CEST: START 450w: latency oneway_bw h0->h1
+- 2026-04-25 15:07:10 CEST: DONE 450w: latency oneway_bw h0->h1
+- 2026-04-25 15:07:11 CEST: START 450w: latency oneway_bw h0->l0
+- 2026-04-25 15:07:11 CEST: DONE 450w: latency oneway_bw h0->l0
+- 2026-04-25 15:07:12 CEST: START 450w: latency oneway_bw h0->l1
+- 2026-04-25 15:07:13 CEST: DONE 450w: latency oneway_bw h0->l1
+- 2026-04-25 15:07:14 CEST: START 450w: latency oneway_bw h1->h0
+- 2026-04-25 15:07:15 CEST: DONE 450w: latency oneway_bw h1->h0
+- 2026-04-25 15:07:16 CEST: START 450w: latency oneway_bw h1->l0
+- 2026-04-25 15:07:17 CEST: DONE 450w: latency oneway_bw h1->l0
+- 2026-04-25 15:07:18 CEST: START 450w: latency oneway_bw h1->l1
+- 2026-04-25 15:07:18 CEST: DONE 450w: latency oneway_bw h1->l1
+- 2026-04-25 15:07:19 CEST: START 450w: latency oneway_bw l0->h0
+- 2026-04-25 15:07:20 CEST: DONE 450w: latency oneway_bw l0->h0
+- 2026-04-25 15:07:21 CEST: START 450w: latency oneway_bw l0->h1
+- 2026-04-25 15:07:22 CEST: DONE 450w: latency oneway_bw l0->h1
+- 2026-04-25 15:07:23 CEST: START 450w: latency oneway_bw l0->l1
+- 2026-04-25 15:07:24 CEST: DONE 450w: latency oneway_bw l0->l1
+- 2026-04-25 15:07:25 CEST: START 450w: latency oneway_bw l1->h0
+- 2026-04-25 15:07:26 CEST: DONE 450w: latency oneway_bw l1->h0
+- 2026-04-25 15:07:27 CEST: START 450w: latency oneway_bw l1->h1
+- 2026-04-25 15:07:27 CEST: DONE 450w: latency oneway_bw l1->h1
+- 2026-04-25 15:07:28 CEST: START 450w: latency oneway_bw l1->l0
+- 2026-04-25 15:07:30 CEST: DONE 450w: latency oneway_bw l1->l0
+- 2026-04-25 15:07:31 CEST: START 450w: latency roundtrip_lat h0->h1
+- 2026-04-25 15:07:32 CEST: DONE 450w: latency roundtrip_lat h0->h1
+- 2026-04-25 15:07:33 CEST: START 450w: latency roundtrip_lat h0->l0
+- 2026-04-25 15:07:34 CEST: DONE 450w: latency roundtrip_lat h0->l0
+- 2026-04-25 15:07:35 CEST: START 450w: latency roundtrip_lat h0->l1
+- 2026-04-25 15:07:36 CEST: DONE 450w: latency roundtrip_lat h0->l1
+- 2026-04-25 15:07:37 CEST: START 450w: latency roundtrip_lat h1->h0
+- 2026-04-25 15:07:38 CEST: DONE 450w: latency roundtrip_lat h1->h0
+- 2026-04-25 15:07:39 CEST: START 450w: latency roundtrip_lat h1->l0
+- 2026-04-25 15:07:40 CEST: DONE 450w: latency roundtrip_lat h1->l0
+- 2026-04-25 15:07:41 CEST: START 450w: latency roundtrip_lat h1->l1
+- 2026-04-25 15:07:42 CEST: DONE 450w: latency roundtrip_lat h1->l1
+- 2026-04-25 15:07:43 CEST: START 450w: latency roundtrip_lat l0->h0
+- 2026-04-25 15:07:44 CEST: DONE 450w: latency roundtrip_lat l0->h0
+- 2026-04-25 15:07:45 CEST: START 450w: latency roundtrip_lat l0->h1
+- 2026-04-25 15:07:46 CEST: DONE 450w: latency roundtrip_lat l0->h1
+- 2026-04-25 15:07:47 CEST: START 450w: latency roundtrip_lat l0->l1
+- 2026-04-25 15:07:50 CEST: DONE 450w: latency roundtrip_lat l0->l1
+- 2026-04-25 15:07:51 CEST: START 450w: latency roundtrip_lat l1->h0
+- 2026-04-25 15:07:52 CEST: DONE 450w: latency roundtrip_lat l1->h0
+- 2026-04-25 15:07:53 CEST: START 450w: latency roundtrip_lat l1->h1
+- 2026-04-25 15:07:54 CEST: DONE 450w: latency roundtrip_lat l1->h1
+- 2026-04-25 15:07:55 CEST: START 450w: latency roundtrip_lat l1->l0
+- 2026-04-25 15:07:58 CEST: DONE 450w: latency roundtrip_lat l1->l0
+- 2026-04-25 15:07:59 CEST: START 450w: mixbench gpu=0
+- 2026-04-25 15:07:59 CEST: DONE 450w: mixbench gpu=0
+- 2026-04-25 15:08:00 CEST: START 450w: mixbench gpu=1
+- 2026-04-25 15:08:01 CEST: DONE 450w: mixbench gpu=1
+- 2026-04-25 15:08:02 CEST: START 450w: sustained h0->h1 chunk=1048576
+- 2026-04-25 15:08:04 CEST: DONE 450w: sustained h0->h1 chunk=1048576
+- 2026-04-25 15:08:05 CEST: START 450w: sustained h0->h1 chunk=16777216
+- 2026-04-25 15:08:07 CEST: DONE 450w: sustained h0->h1 chunk=16777216
+- 2026-04-25 15:08:08 CEST: START 450w: sustained h0->l0 chunk=1048576
+- 2026-04-25 15:08:09 CEST: DONE 450w: sustained h0->l0 chunk=1048576
+- 2026-04-25 15:08:10 CEST: START 450w: sustained h0->l0 chunk=16777216
+- 2026-04-25 15:08:10 CEST: DONE 450w: sustained h0->l0 chunk=16777216
+- 2026-04-25 15:08:11 CEST: START 450w: sustained h0->l1 chunk=1048576
+- 2026-04-25 15:08:12 CEST: DONE 450w: sustained h0->l1 chunk=1048576
+- 2026-04-25 15:08:13 CEST: START 450w: sustained h0->l1 chunk=16777216
+- 2026-04-25 15:08:14 CEST: DONE 450w: sustained h0->l1 chunk=16777216
+- 2026-04-25 15:08:15 CEST: START 450w: sustained h1->h0 chunk=1048576
+- 2026-04-25 15:08:18 CEST: DONE 450w: sustained h1->h0 chunk=1048576
+- 2026-04-25 15:08:19 CEST: START 450w: sustained h1->h0 chunk=16777216
+- 2026-04-25 15:08:21 CEST: DONE 450w: sustained h1->h0 chunk=16777216
+- 2026-04-25 15:08:22 CEST: START 450w: sustained h1->l0 chunk=1048576
+- 2026-04-25 15:08:23 CEST: DONE 450w: sustained h1->l0 chunk=1048576
+- 2026-04-25 15:08:24 CEST: START 450w: sustained h1->l0 chunk=16777216
+- 2026-04-25 15:08:25 CEST: DONE 450w: sustained h1->l0 chunk=16777216
+- 2026-04-25 15:08:26 CEST: START 450w: sustained h1->l1 chunk=1048576
+- 2026-04-25 15:08:26 CEST: DONE 450w: sustained h1->l1 chunk=1048576
+- 2026-04-25 15:08:27 CEST: START 450w: sustained h1->l1 chunk=16777216
+- 2026-04-25 15:08:28 CEST: DONE 450w: sustained h1->l1 chunk=16777216
+- 2026-04-25 15:08:29 CEST: START 450w: sustained l0->h0 chunk=1048576
+- 2026-04-25 15:08:30 CEST: DONE 450w: sustained l0->h0 chunk=1048576
+- 2026-04-25 15:08:31 CEST: START 450w: sustained l0->h0 chunk=16777216
+- 2026-04-25 15:08:31 CEST: DONE 450w: sustained l0->h0 chunk=16777216
+- 2026-04-25 15:08:32 CEST: START 450w: sustained l0->h1 chunk=1048576
+- 2026-04-25 15:08:34 CEST: DONE 450w: sustained l0->h1 chunk=1048576
+- 2026-04-25 15:08:35 CEST: START 450w: sustained l0->h1 chunk=16777216
+- 2026-04-25 15:08:36 CEST: DONE 450w: sustained l0->h1 chunk=16777216
+- 2026-04-25 15:08:37 CEST: START 450w: sustained l0->l1 chunk=1048576
+- 2026-04-25 15:08:40 CEST: DONE 450w: sustained l0->l1 chunk=1048576
+- 2026-04-25 15:08:41 CEST: START 450w: sustained l0->l1 chunk=16777216
+- 2026-04-25 15:08:47 CEST: DONE 450w: sustained l0->l1 chunk=16777216
+- 2026-04-25 15:08:48 CEST: START 450w: sustained l1->h0 chunk=1048576
+- 2026-04-25 15:08:49 CEST: DONE 450w: sustained l1->h0 chunk=1048576
+- 2026-04-25 15:08:50 CEST: START 450w: sustained l1->h0 chunk=16777216
+- 2026-04-25 15:08:51 CEST: DONE 450w: sustained l1->h0 chunk=16777216
+- 2026-04-25 15:08:52 CEST: START 450w: sustained l1->h1 chunk=1048576
+- 2026-04-25 15:08:52 CEST: DONE 450w: sustained l1->h1 chunk=1048576
+- 2026-04-25 15:08:53 CEST: START 450w: sustained l1->h1 chunk=16777216
+- 2026-04-25 15:08:54 CEST: DONE 450w: sustained l1->h1 chunk=16777216
+- 2026-04-25 15:08:55 CEST: START 450w: sustained l1->l0 chunk=1048576
+- 2026-04-25 15:08:57 CEST: DONE 450w: sustained l1->l0 chunk=1048576
+- 2026-04-25 15:08:58 CEST: START 450w: sustained l1->l0 chunk=16777216
+- 2026-04-25 15:09:04 CEST: DONE 450w: sustained l1->l0 chunk=16777216
+- 2026-04-25 15:09:05 CEST: START 450w: NVBandwidth host_to_device_memcpy_ce host_on_node0
+- 2026-04-25 15:09:06 CEST: DONE 450w: NVBandwidth host_to_device_memcpy_ce host_on_node0
+- 2026-04-25 15:09:07 CEST: START 450w: NVBandwidth host_to_device_memcpy_ce host_on_node1
+- 2026-04-25 15:09:08 CEST: DONE 450w: NVBandwidth host_to_device_memcpy_ce host_on_node1
+- 2026-04-25 15:09:09 CEST: START 450w: NVBandwidth device_to_host_memcpy_ce host_on_node0
+- 2026-04-25 15:09:11 CEST: DONE 450w: NVBandwidth device_to_host_memcpy_ce host_on_node0
+- 2026-04-25 15:09:12 CEST: START 450w: NVBandwidth device_to_host_memcpy_ce host_on_node1
+- 2026-04-25 15:09:13 CEST: DONE 450w: NVBandwidth device_to_host_memcpy_ce host_on_node1
+- 2026-04-25 15:09:14 CEST: START 450w: NVBandwidth host_to_device_memcpy_sm host_on_node0
+- 2026-04-25 15:09:15 CEST: DONE 450w: NVBandwidth host_to_device_memcpy_sm host_on_node0
+- 2026-04-25 15:09:16 CEST: START 450w: NVBandwidth host_to_device_memcpy_sm host_on_node1
+- 2026-04-25 15:09:18 CEST: DONE 450w: NVBandwidth host_to_device_memcpy_sm host_on_node1
+- 2026-04-25 15:09:19 CEST: START 450w: NVBandwidth device_to_host_memcpy_sm host_on_node0
+- 2026-04-25 15:09:20 CEST: DONE 450w: NVBandwidth device_to_host_memcpy_sm host_on_node0
+- 2026-04-25 15:09:21 CEST: START 450w: NVBandwidth device_to_host_memcpy_sm host_on_node1
+- 2026-04-25 15:09:22 CEST: DONE 450w: NVBandwidth device_to_host_memcpy_sm host_on_node1
+- 2026-04-25 15:09:23 CEST: START 450w: NVBandwidth device_local_copy
+- 2026-04-25 15:09:24 CEST: DONE 450w: NVBandwidth device_local_copy
+- 2026-04-25 15:09:25 CEST: Captured 450w locked-clock context after tests
+- 2026-04-25 15:09:25 CEST: SECTION tuned_450w_locked_clocks finished

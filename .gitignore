@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+.venv/
+venv/
+env/
+
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# Benchmark outputs are written outside this repository by default.
+gh200-bench/
+run-*/
+smoke-*/
+
